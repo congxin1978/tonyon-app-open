@@ -1,0 +1,111 @@
+<!DOCTYPE html><html lang="zh-HK"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><title>TONYON 打卡</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px}.card{background:#fff;border-radius:20px;padding:32px 24px;width:100%;max-width:480px;box-shadow:0 4px 24px rgba(0,0,0,.10);margin-bottom:16px}h1{font-size:42px;font-weight:700;color:#1a3a2a;text-align:center;margin-bottom:6px}.sub{font-size:26px;color:#888;text-align:center;margin-bottom:20px}.welcome{font-size:28px;font-weight:700;color:#2E7D32;text-align:center;background:#e8f5e9;border-radius:12px;padding:14px;margin-bottom:14px;display:none}label{font-size:26px;font-weight:600;color:#555;display:block;margin-bottom:8px;margin-top:18px}.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}.type-btn{border:3px solid #e0e0e0;background:#fff;border-radius:14px;padding:18px 8px;text-align:center;cursor:pointer;font-size:28px;font-weight:700;color:#555;transition:all .15s}.type-btn.selected{border-color:#2E7D32;background:#e8f5e9;color:#2E7D32}.icon{font-size:44px;display:block;margin-bottom:6px}.gps-row{display:flex;align-items:center;gap:14px;margin-top:10px}.gps-st{flex:1;font-size:26px;color:#888}.ok-txt{color:#2E7D32;font-weight:600}.err-txt{color:#c62828}.btn-gps{background:#1565C0;color:#fff;border:none;border-radius:12px;padding:14px 20px;font-size:26px;font-weight:600;cursor:pointer;white-space:nowrap}.pin-wrap{display:block}input[type=password]{width:100%;border:3px solid #e0e0e0;border-radius:14px;padding:18px 20px;font-size:40px;letter-spacing:10px;text-align:center;outline:none;transition:border .15s}input[type=password]:focus{border-color:#2E7D32}.sub-btn{width:100%;background:#2E7D32;color:#fff;border:none;border-radius:16px;padding:22px;font-size:36px;font-weight:700;cursor:pointer;margin-top:22px}.sub-btn-dis{background:#aaa;cursor:not-allowed}.result-card{border-radius:16px;padding:28px;text-align:center;display:none}.result-ok{background:#e8f5e9;border:3px solid #4caf50}.result-fail{background:#ffebee;border:3px solid #ef5350}.ri{font-size:96px;margin-bottom:12px}.rm{font-size:36px;font-weight:700;margin-bottom:6px}.rd{font-size:28px;color:#555}.retry{margin-top:18px;background:#546E7A;color:#fff;border:none;border-radius:12px;padding:16px 32px;font-size:30px;font-weight:600;cursor:pointer}.rescan-btn{margin-top:12px;background:#E65100;color:#fff;border:none;border-radius:12px;padding:16px 32px;font-size:30px;font-weight:600;cursor:pointer;display:none}.rescan-msg{display:none;margin-top:14px;font-size:26px;color:#555;text-align:center;background:#FFF3E0;border-radius:10px;padding:16px}</style></head><body>
+<div class="card" id="fc">
+  <h1>🏪 TONYON 打卡</h1>
+  <div class="sub" id="pg-sub">請選擇類型並輸入 PIN</div>
+  <div class="welcome" id="welcome">👤 歡迎，<span id="emp-name"></span></div>
+  <label>打卡類型</label>
+  <div class="type-grid">
+    <div class="type-btn" id="b1" data-type="clock_in" onclick="sel(this)"><span class="icon">🌅</span>上班</div>
+    <div class="type-btn" id="b2" data-type="lunch_out" onclick="sel(this)"><span class="icon">🍽️</span>午餐出</div>
+    <div class="type-btn" id="b3" data-type="lunch_in" onclick="sel(this)"><span class="icon">🔙</span>午餐入</div>
+    <div class="type-btn" id="b4" data-type="clock_out" onclick="sel(this)"><span class="icon">🌙</span>下班</div>
+  </div>
+  <label>GPS 定位</label>
+  <div class="gps-row">
+    <span class="gps-st" id="gs">尚未定位</span>
+    <button class="btn-gps" onclick="getG()">📍 定位</button>
+  </div>
+  <div class="pin-wrap" id="pin-wrap">
+    <label>個人 PIN（6位數字）</label>
+    <input type="password" id="pin" maxlength="6" inputmode="numeric" placeholder="••••••" autocomplete="off" oninput="upd()">
+  </div>
+  <button class="sub-btn sub-btn-dis" id="sb" onclick="go()">請完成所有步驟</button>
+</div>
+
+<div class="card result-card" id="rc">
+  <div class="ri" id="ri">✅</div>
+  <div class="rm" id="rm"></div>
+  <div class="rd" id="rd"></div>
+  <button class="retry" onclick="rst()">🔄 重新打卡</button>
+  <button class="rescan-btn" id="rescan-btn" onclick="doRescan()">📷 重新掃描</button>
+  <div class="rescan-msg" id="rescan-msg">請返回掃描器重新掃描 QR 碼</div>
+</div>
+
+<script>
+var API='https://hphdrpykabgxwhyfgxcj.supabase.co/functions/v1/attend-punch';
+var TOK=new URLSearchParams(window.location.search).get('token')||'';
+var gps=null,pt=null,useDT=false;
+var did=localStorage.getItem('ty_did');
+if(!did){did=Math.random().toString(36).slice(2,9)+Date.now().toString(36);localStorage.setItem('ty_did',did);}
+var dtoken=localStorage.getItem('ty_dtoken')||'';
+
+window.onload=function(){
+  getG();
+  // 綁定掃描：告知伺服器為此設備保留 token 60 秒，防止填表中途過期
+  if(TOK) fetch(API,{method:'POST',headers:{'content-type':'text/plain'},body:JSON.stringify({action:'bind_scan',token:TOK,deviceId:did})}).catch(function(){});
+  // 若有已儲存的設備 token，嘗試自動識別（免 PIN）
+  if(dtoken) fetch(API,{method:'POST',headers:{'content-type':'text/plain'},body:JSON.stringify({action:'validate_device',deviceId:did,deviceToken:dtoken})})
+    .then(function(r){return r.json();})
+    .then(function(r){
+      if(r.ok&&r.employeeName){
+        useDT=true;
+        document.getElementById('pin-wrap').style.display='none';
+        document.getElementById('emp-name').textContent=r.employeeName;
+        document.getElementById('welcome').style.display='block';
+        document.getElementById('pg-sub').textContent='免 PIN 打卡（已識別設備）';
+        upd();
+      }
+    }).catch(function(){});
+};
+
+function sel(el){['b1','b2','b3','b4'].forEach(function(id){document.getElementById(id).className='type-btn';});el.className='type-btn selected';pt=el.getAttribute('data-type');upd();}
+function upd(){var pinOk=useDT||document.getElementById('pin').value.length>=6;var ok=gps&&pt&&pinOk;var b=document.getElementById('sb');b.className=ok?'sub-btn':'sub-btn sub-btn-dis';b.textContent=ok?'✅ 確認打卡':'請完成所有步驟';}
+function getG(){var st=document.getElementById('gs');st.className='gps-st';st.textContent='定位中...';navigator.geolocation.getCurrentPosition(function(p){gps={lat:p.coords.latitude,lng:p.coords.longitude};st.className='gps-st ok-txt';st.textContent='✅ 成功（精度 '+Math.round(p.coords.accuracy)+'m）';upd();},function(e){st.className='gps-st err-txt';st.textContent='❌ '+(e.code===1?'已拒絕位置權限':e.code===2?'無法取得位置':'定位超時');},{timeout:15000,enableHighAccuracy:true});}
+
+function go(){
+  if(!gps||!pt)return;
+  var pin=document.getElementById('pin').value;
+  if(!useDT&&pin.length<6)return;
+  var b=document.getElementById('sb');b.className='sub-btn sub-btn-dis';b.textContent='提交中...';
+  var body={action:'punch',token:TOK,lat:gps.lat,lng:gps.lng,punchType:pt,deviceId:did};
+  if(useDT){body.deviceToken=dtoken;}else{body.pin=pin;}
+  fetch(API,{method:'POST',headers:{'content-type':'text/plain'},body:JSON.stringify(body)})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(res.ok&&res.deviceToken){localStorage.setItem('ty_dtoken',res.deviceToken);}
+      show(res);
+    }).catch(function(e){show({ok:false,error:'網絡錯誤：'+e.message});});
+}
+
+function show(r){
+  document.getElementById('fc').style.display='none';
+  var rc=document.getElementById('rc');rc.style.display='block';
+  rc.className='card result-card '+(r.ok?'result-ok':'result-fail');
+  document.getElementById('ri').textContent=r.ok?'✅':'❌';
+  document.getElementById('rm').textContent=r.ok?r.msg:(r.error||'打卡失敗');
+  var empN=r.name||document.getElementById('emp-name').textContent||'';
+  document.getElementById('rd').textContent=r.ok?(empN+' · '+r.time):'';
+  var isExpiry=!r.ok&&r.error&&r.error.indexOf('過期')>=0;
+  document.getElementById('rescan-btn').style.display=isExpiry?'inline-block':'none';
+}
+
+function doRescan(){
+  window.close();
+  setTimeout(function(){
+    document.getElementById('rescan-msg').style.display='block';
+    document.getElementById('rescan-btn').style.display='none';
+  },500);
+}
+
+function rst(){
+  document.getElementById('fc').style.display='block';
+  document.getElementById('rc').style.display='none';
+  document.getElementById('pin').value='';
+  ['b1','b2','b3','b4'].forEach(function(id){document.getElementById(id).className='type-btn';});
+  pt=null;gps=null;
+  document.getElementById('gs').className='gps-st';document.getElementById('gs').textContent='尚未定位';
+  document.getElementById('rescan-msg').style.display='none';
+  upd();getG();
+}
+</script>
+</body></html>
