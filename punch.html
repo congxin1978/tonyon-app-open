@@ -16,8 +16,8 @@
     <button class="btn-gps" onclick="getG()">📍 定位</button>
   </div>
   <div class="pin-wrap" id="pin-wrap">
-    <label>個人 PIN（6位數字）</label>
-    <input type="password" id="pin" maxlength="6" inputmode="numeric" placeholder="••••••" autocomplete="off" oninput="upd()">
+    <label>個人 PIN（4位數字）</label>
+    <input type="password" id="pin" maxlength="4" inputmode="numeric" placeholder="••••" autocomplete="off" oninput="upd()">
   </div>
   <button class="sub-btn sub-btn-dis" id="sb" onclick="go()">請完成所有步驟</button>
 </div>
@@ -59,13 +59,13 @@ window.onload=function(){
 };
 
 function sel(el){['b1','b2','b3','b4'].forEach(function(id){document.getElementById(id).className='type-btn';});el.className='type-btn selected';pt=el.getAttribute('data-type');upd();}
-function upd(){var pinOk=useDT||document.getElementById('pin').value.length>=6;var ok=gps&&pt&&pinOk;var b=document.getElementById('sb');b.className=ok?'sub-btn':'sub-btn sub-btn-dis';b.textContent=ok?'✅ 確認打卡':'請完成所有步驟';}
+function upd(){var pinOk=useDT||document.getElementById('pin').value.length>=4;var ok=gps&&pt&&pinOk;var b=document.getElementById('sb');b.className=ok?'sub-btn':'sub-btn sub-btn-dis';b.textContent=ok?'✅ 確認打卡':'請完成所有步驟';}
 function getG(){var st=document.getElementById('gs');st.className='gps-st';st.textContent='定位中...';navigator.geolocation.getCurrentPosition(function(p){gps={lat:p.coords.latitude,lng:p.coords.longitude};st.className='gps-st ok-txt';st.textContent='✅ 成功（精度 '+Math.round(p.coords.accuracy)+'m）';upd();},function(e){st.className='gps-st err-txt';st.textContent='❌ '+(e.code===1?'已拒絕位置權限':e.code===2?'無法取得位置':'定位超時');},{timeout:15000,enableHighAccuracy:true});}
 
 function go(){
   if(!gps||!pt)return;
   var pin=document.getElementById('pin').value;
-  if(!useDT&&pin.length<6)return;
+  if(!useDT&&pin.length<4)return;
   var b=document.getElementById('sb');b.className='sub-btn sub-btn-dis';b.textContent='提交中...';
   var body={action:'punch',token:TOK,lat:gps.lat,lng:gps.lng,punchType:pt,deviceId:did};
   if(useDT){body.deviceToken=dtoken;}else{body.pin=pin;}
